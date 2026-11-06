@@ -347,7 +347,7 @@ struct Ring: View {
     @StateObject private var st = RingState()
     private var ringColor: Color { value > 85 ? statusColor(.stressed) : value > 65 ? statusColor(.busy) : base }
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             ZStack {
                 Circle().stroke(Color.primary.opacity(0.1), lineWidth: 3)
                 Circle().trim(from: 0, to: CGFloat(min(max(st.shown, 1), 100) / 100))
@@ -355,8 +355,8 @@ struct Ring: View {
                     .rotationEffect(.degrees(-90))
                 Text("\(Int(value))").font(.system(size: 19, weight: .light)) + Text("%").font(.system(size: 9, weight: .regular)).foregroundColor(.secondary)
             }.frame(width: 58, height: 58)
-            Text(label.uppercased()).font(.system(size: 8, weight: .semibold)).tracking(1.2)
-            Text(sub).font(.system(size: 8, weight: .regular)).foregroundStyle(.secondary).lineLimit(1)
+            Text(label.uppercased()).font(.system(size: 7, weight: .semibold)).tracking(1.1)
+            Text(sub).font(.system(size: 7, weight: .regular)).foregroundStyle(.secondary.opacity(0.8)).lineLimit(1)
         }
         .frame(maxWidth: .infinity)
         .onAppear { st.shown = value }   // no animation on first draw

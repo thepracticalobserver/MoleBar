@@ -3,9 +3,9 @@
 A small macOS menu bar app that tells you at a glance whether your Mac is healthy, lists what's eating your resources, and cleans up disk space using [Mole](https://github.com/tw93/Mole).
 
 <p align="center">
-  <img src="docs/overview-v113.png" width="260" alt="Overview">
-  <img src="docs/clean-v113.png" width="260" alt="Scan result">
-  <img src="docs/apps-v113.png" width="260" alt="Apps">
+  <img src="docs/overview-v114.png" width="260" alt="Overview">
+  <img src="docs/clean-v114.png" width="260" alt="Scan result">
+  <img src="docs/apps-v114.png" width="260" alt="Apps">
 </p>
 
 ## Features

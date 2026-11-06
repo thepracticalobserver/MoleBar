@@ -43,6 +43,10 @@ final class StatsSampler {
     private var prevTicks: [[UInt32]] = []
     private var pluggedSince: Date?
     private var prevNet: (rx: UInt64, tx: UInt64, t: Date)?
+    private let healthLock = NSLock()
+    private var systemHealth: Int?
+    private var systemHealthAt = Date.distantPast
+    private var systemHealthBusy = false
 
 
     func sample() -> Snapshot {
@@ -130,13 +134,51 @@ final class StatsSampler {
         guard IORegistryEntryCreateCFProperties(svc, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
               let d = props?.takeRetainedValue() as? [String: Any] else { return }
         s.plugged = (d["ExternalConnected"] as? Bool) ?? false
-        s.batteryHealth = Self.health(d)
+        refreshSystemHealth()
+        healthLock.lock(); let fromSystem = systemHealth; healthLock.unlock()
+        s.batteryHealth = fromSystem ?? Self.health(d)
         if s.plugged { if pluggedSince == nil { pluggedSince = Date() } } else { pluggedSince = nil }
         s.justPlugged = pluggedSince.map { Date().timeIntervalSince($0) < 45 } ?? false
         if let a = d["AdapterDetails"] as? [String: Any], let w = a["Watts"] as? Int, w > 0 { s.adapterWatts = Double(w) }
         if let t = d["PowerTelemetryData"] as? [String: Any] {
             if let p = t["SystemPowerIn"] as? Int { s.powerInWatts = Double(p) / 1000 }
             if let l = t["SystemLoad"] as? Int { s.systemLoadWatts = Double(l) / 1000 }
+        }
+    }
+
+    /// The Maximum Capacity figure macOS itself reports (what System Settings shows under Battery > Health), via
+    /// `system_profiler`. It is quick (~0.1s) and the value moves slowly, so it is refreshed in the background every
+    /// 15 minutes. If it can't be read, the registry calculation below is used instead.
+    private func refreshSystemHealth() {
+        healthLock.lock()
+        let due = !systemHealthBusy && Date().timeIntervalSince(systemHealthAt) > 900
+        if due { systemHealthBusy = true }
+        healthLock.unlock()
+        guard due else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            var value: Int?
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+            p.arguments = ["SPPowerDataType", "-json"]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = FileHandle.nullDevice
+            if (try? p.run()) != nil {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                p.waitUntilExit()
+                if let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let items = j["SPPowerDataType"] as? [[String: Any]] {
+                    for it in items {
+                        if let h = it["sppower_battery_health_info"] as? [String: Any],
+                           let t = h["sppower_battery_health_maximum_capacity"] as? String,
+                           let n = Int(t.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) { value = n }
+                    }
+                }
+            }
+            guard let self else { return }
+            self.healthLock.lock()
+            self.systemHealth = value; self.systemHealthAt = Date(); self.systemHealthBusy = false
+            self.healthLock.unlock()
         }
     }
 
