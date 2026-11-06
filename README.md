@@ -3,9 +3,9 @@
 A small macOS menu bar app that tells you at a glance whether your Mac is healthy, lists what's eating your resources, and cleans up disk space using [Mole](https://github.com/tw93/Mole).
 
 <p align="center">
-  <img src="docs/overview-v110.png" width="260" alt="Overview">
-  <img src="docs/clean-v110.png" width="260" alt="Scan result">
-  <img src="docs/apps-v110.png" width="260" alt="Apps">
+  <img src="docs/overview-v113.png" width="260" alt="Overview">
+  <img src="docs/clean-v113.png" width="260" alt="Scan result">
+  <img src="docs/apps-v113.png" width="260" alt="Apps">
 </p>
 
 ## Features
@@ -14,7 +14,7 @@ A small macOS menu bar app that tells you at a glance whether your Mac is health
 
 **Overview** – everything on one page, no scrolling
 - CPU, Memory and Disk rings (they turn amber above 65% and red above 85%)
-- **Power In** (live watts from the charger, or the Mac's draw on battery) and a real **Temp** reading side by side
+- **Battery Health** (maximum capacity vs. when it was new) and **Power In** (live watts from the charger, or the Mac's draw on battery) side by side
 - The heaviest apps, each with a ✕ to force quit (one confirm; ⌥-click skips it)
 - **Free up space**: *Scan* runs `mo clean --dry-run` and shows how much can be freed, then *Clean* runs `mo clean` with a progress bar. The layout doesn't move while it runs, and the full Mole output is behind *show log*
 
@@ -55,8 +55,8 @@ Handy for UI work: `build/MoleBar.app/Contents/MacOS/MoleBar --snapshot <dir>` r
 - The Clean progress bar is an estimate based on Mole's section headers.
 - macOS refreshes its charger power reading only about every 15 seconds, and can take a while to report charging after you plug in, so the Power In tile can lag the real value.
 - **Free up space** shells out to [Mole](https://github.com/tw93/Mole)'s `mo clean`. If Trash isn't emptied, that comes from Mole: it asks Finder to empty it (macOS may prompt for permission) and otherwise needs **Full Disk Access**. Grant Full Disk Access to MoleBar in System Settings → Privacy & Security if you want Trash cleaned reliably.
-- MoleBar uses a couple of private macOS interfaces (the chip temperature sensors, and hiding the popover arrow). That's fine for a GitHub-distributed app but rules out the App Store, and a macOS update could break them.
-- **Temp** is the average of the chip's die sensors, read through a private IOKit interface (no sudo). It works on Apple Silicon; on Intel Macs the tile falls back to Normal / Warm / Hot / Critical. A future macOS update could break it.
+- MoleBar uses a private macOS interface to hide the popover arrow. That's fine for a GitHub-distributed app but rules out the App Store, and a macOS update could break them.
+- **Health** is the battery's full-charge capacity divided by its design capacity, read from macOS's battery registry (the figure System Settings calls *Maximum Capacity*). Desktop Macs have no battery, so the tiles don't appear.
 
 ## Project layout
 
@@ -64,7 +64,6 @@ Handy for UI work: `build/MoleBar.app/Contents/MacOS/MoleBar --snapshot <dir>` r
 | --- | --- |
 | `Sources/MoleBar/main.swift` | Status item, popover, snapshot helper |
 | `Sources/MoleBar/SystemStats.swift` | CPU, memory, disk, battery, power sampling and health status |
-| `Sources/MoleBar/Temperature.swift` | SoC temperature from the HID sensors |
 | `Sources/MoleBar/AppsMonitor.swift` | Per-app CPU and memory |
 | `Sources/MoleBar/Cleaner.swift` | Runs and parses `mo clean` |
 | `Sources/MoleBar/Views.swift` | SwiftUI interface |

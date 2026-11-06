@@ -292,7 +292,7 @@ struct Tile: View {
                 Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(iconColor)
                     .frame(width: 25, height: 25).background(Circle().fill(Color.primary.opacity(0.08)))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(caption.uppercased()).font(.system(size: 7.5, weight: .semibold)).tracking(1.1).foregroundStyle(.secondary).lineLimit(1)
+                    Text(caption.uppercased()).font(.system(size: 7.5, weight: .semibold)).tracking(1.1).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                     Text(value).font(.system(size: 15, weight: .light)).foregroundStyle(valueColor).monospacedDigit()
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
@@ -302,18 +302,17 @@ struct Tile: View {
     }
 }
 
-/// The real SoC temperature and Power in (live watts from the charger), side by side.
+/// Battery health and Power in (live watts from the charger), side by side.
+/// Desktop Macs have no battery, so the row is empty and the app list takes the space.
 struct TilesRow: View {
     let s: Snapshot
     var body: some View {
-        HStack(spacing: 8) {
-            if let t = s.tempC {
-                Tile(icon: "thermometer.medium", caption: "Temp", value: String(format: "%.0f°C", t),
-                     valueColor: t >= 90 ? statusColor(.stressed) : t >= 80 ? statusColor(.busy) : .primary)
-            } else {
-                Tile(icon: "thermometer.medium", caption: "Temp", value: ["Normal", "Warm", "Hot", "Critical"][s.thermal.rawValue])
-            }
-            if let p = powerBadge(s) {
+        if let p = powerBadge(s) {
+            HStack(spacing: 8) {
+                if let h = s.batteryHealth {
+                    Tile(icon: "heart.fill", caption: "Battery health", value: "\(h)%",
+                         valueColor: h < 60 ? statusColor(.stressed) : h < 80 ? statusColor(.busy) : .primary)
+                }
                 Tile(icon: p.icon, caption: p.caption, value: p.value, iconColor: s.plugged ? statusColor(.good) : .secondary)
             }
         }

@@ -19,7 +19,7 @@ struct Snapshot {
     var justPlugged = false           // charger connected <45s ago; macOS refreshes its power reading only every ~15s
     var adapterWatts: Double? = nil   // rated output of the connected charger
     var powerInWatts: Double? = nil   // live power drawn from the charger
-    var tempC: Double? = nil           // average CPU die temperature
+    var batteryHealth: Int? = nil     // maximum capacity vs. design capacity, in % (what System Settings calls Maximum Capacity)
     var systemLoadWatts: Double? = nil // live power the Mac itself is using
     var load: (Double, Double, Double) = (0, 0, 0)
     var uptime: TimeInterval = 0
@@ -44,7 +44,6 @@ final class StatsSampler {
     private var pluggedSince: Date?
     private var prevNet: (rx: UInt64, tx: UInt64, t: Date)?
 
-    private let temperature = SystemTemperature()
 
     func sample() -> Snapshot {
         var s = Snapshot()
@@ -54,7 +53,6 @@ final class StatsSampler {
         battery(&s)
         power(&s)
         s.thermal = ProcessInfo.processInfo.thermalState
-        s.tempC = temperature.read()
         var l = [Double](repeating: 0, count: 3)
         getloadavg(&l, 3)
         s.load = (l[0], l[1], l[2])
@@ -132,6 +130,7 @@ final class StatsSampler {
         guard IORegistryEntryCreateCFProperties(svc, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
               let d = props?.takeRetainedValue() as? [String: Any] else { return }
         s.plugged = (d["ExternalConnected"] as? Bool) ?? false
+        s.batteryHealth = Self.health(d)
         if s.plugged { if pluggedSince == nil { pluggedSince = Date() } } else { pluggedSince = nil }
         s.justPlugged = pluggedSince.map { Date().timeIntervalSince($0) < 45 } ?? false
         if let a = d["AdapterDetails"] as? [String: Any], let w = a["Watts"] as? Int, w > 0 { s.adapterWatts = Double(w) }
@@ -139,6 +138,19 @@ final class StatsSampler {
             if let p = t["SystemPowerIn"] as? Int { s.powerInWatts = Double(p) / 1000 }
             if let l = t["SystemLoad"] as? Int { s.systemLoadWatts = Double(l) / 1000 }
         }
+    }
+
+    /// Battery health = full-charge capacity / design capacity from the AppleSmartBattery registry entry.
+    /// Apple Silicon reports NominalChargeCapacity (inside BatteryData); older Macs report MaxCapacity in mAh.
+    /// Integer division floors, which matches the figure System Settings shows.
+    private static func health(_ d: [String: Any]) -> Int? {
+        let bd = d["BatteryData"] as? [String: Any] ?? [:]
+        let design = (bd["DesignCapacity"] as? Int) ?? (d["DesignCapacity"] as? Int) ?? 0
+        guard design > 0 else { return nil }
+        let full = (bd["NominalChargeCapacity"] as? Int) ?? (d["NominalChargeCapacity"] as? Int) ?? (d["AppleRawMaxCapacity"] as? Int) ?? 0
+        if full > 0 { return min(100, full * 100 / design) }
+        if let mx = d["MaxCapacity"] as? Int, mx > 100 { return min(100, mx * 100 / design) }
+        return nil
     }
 
     private func network(_ s: inout Snapshot) {
