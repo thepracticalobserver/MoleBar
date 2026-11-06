@@ -325,7 +325,7 @@ struct RingsCard: View {
         Card(pad: 8) {
             let used = s.diskTotalGB - s.diskFreeGB
             HStack(alignment: .top) {
-                Ring(value: s.cpu, label: "CPU", sub: String(format: "load %.2f", s.load.0), base: Color(red: 0.96, green: 0.48, blue: 0.40))
+                Ring(value: s.cpu, label: "CPU", sub: String(format: "Load %.2f", s.load.0), base: Color(red: 0.96, green: 0.48, blue: 0.40))
                 Ring(value: s.memPressure, label: "Memory", sub: String(format: "%.1f / %.0f GB", s.memUsedGB, s.memTotalGB), base: Color(red: 0.29, green: 0.60, blue: 0.95))
                 Ring(value: s.diskTotalGB > 0 ? used / s.diskTotalGB * 100 : 0, label: "Disk", sub: String(format: "%.0f GB free", s.diskFreeGB), base: Color(red: 0.40, green: 0.88, blue: 0.30))
             }
@@ -347,7 +347,7 @@ struct Ring: View {
     @StateObject private var st = RingState()
     private var ringColor: Color { value > 85 ? statusColor(.stressed) : value > 65 ? statusColor(.busy) : base }
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             ZStack {
                 Circle().stroke(Color.primary.opacity(0.1), lineWidth: 3)
                 Circle().trim(from: 0, to: CGFloat(min(max(st.shown, 1), 100) / 100))
@@ -355,8 +355,8 @@ struct Ring: View {
                     .rotationEffect(.degrees(-90))
                 Text("\(Int(value))").font(.system(size: 19, weight: .light)) + Text("%").font(.system(size: 9, weight: .regular)).foregroundColor(.secondary)
             }.frame(width: 58, height: 58)
-            Text(label.uppercased()).font(.system(size: 7, weight: .semibold)).tracking(1.1)
-            Text(sub).font(.system(size: 7, weight: .regular)).foregroundStyle(.secondary.opacity(0.8)).lineLimit(1)
+            Text(label.uppercased()).font(.system(size: 8, weight: .semibold)).tracking(1.2).padding(.top, 5)
+            Text(sub).font(.system(size: 8, weight: .regular)).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity)
         .onAppear { st.shown = value }   // no animation on first draw
