@@ -115,11 +115,12 @@ struct RootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.22), value: m.page)
             .clipped()
-            HStack {
+            HStack(spacing: 14) {
+                Text("MoleBar").font(rounded(11, .semibold)).foregroundStyle(.tertiary)
+                Spacer()
                 Button { m.toggleLaunchAtLogin() } label: {
                     HStack(spacing: 4) { Image(systemName: m.launchAtLogin ? "checkmark.circle.fill" : "circle"); Text("Start at login") }
                 }
-                Spacer()
                 Button { NSApp.terminate(nil) } label: {
                     HStack(spacing: 4) { Image(systemName: "power"); Text("Quit") }
                 }

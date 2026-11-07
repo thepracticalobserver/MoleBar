@@ -3,14 +3,14 @@
 A small macOS menu bar app that tells you at a glance whether your Mac is healthy, lists what's eating your resources, and cleans up disk space using [Mole](https://github.com/tw93/Mole).
 
 <p align="center">
-  <img src="docs/overview-v115.png" width="260" alt="Overview">
-  <img src="docs/clean-v115.png" width="260" alt="Scan result">
-  <img src="docs/apps-v115.png" width="260" alt="Apps">
+  <img src="docs/overview-v116.png" width="260" alt="Overview">
+  <img src="docs/clean-v116.png" width="260" alt="Scan result">
+  <img src="docs/apps-v116.png" width="260" alt="Apps">
 </p>
 
 ## Features
 
-**Menu bar** – a small animated status icon, in the style you pick (right-click → *Menu bar icon*): **Dot** (a breathing orb), **Glass** (empty when Good, half full when Busy, full when Strained), **Heartbeat**, or **CPU %**. Green, amber and red show Good, Busy and Strained; the animation speeds up as your Mac gets busier. Click it for the full picture; right-click for the icon picker, *Start at login* and *Quit*.
+**Menu bar** – a small animated status icon, in the style you pick (right-click → *Menu bar icon*): **Dot** (a breathing orb), **Glass** (empty when Good, half full when Busy, full when Strained), **Heartbeat**, or **CPU %**. Green, amber and red show Good, Busy and Strained; the animation speeds up as your Mac gets busier. Click it for the full picture; right-click for the icon picker, *Open on hover*, *Start at login* and *Quit*. With **Open on hover** on, resting the pointer on the icon for a moment opens the popover (the icon swells slightly while it waits) and moving away closes it; a click pins it open.
 
 **Overview** – everything on one page, no scrolling
 - CPU, Memory and Disk rings (they turn amber above 65% and red above 85%)

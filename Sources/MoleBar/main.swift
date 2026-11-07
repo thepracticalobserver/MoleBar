@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = NSHostingController(rootView: RootView(m: model))
         model.onUpdate = { [weak self] in self?.refreshIcon() }
         model.start()
+        installHover()
+        updatePointerWatch()
         if let i = CommandLine.arguments.firstIndex(of: "--icon-test"), i + 1 < CommandLine.arguments.count {
             iconTest(to: CommandLine.arguments[i + 1])
         }
@@ -271,6 +273,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let sub = NSMenuItem(title: "Menu bar icon", action: nil, keyEquivalent: "")
         sub.submenu = styles
         menu.addItem(sub)
+        let hover = NSMenuItem(title: "Open on hover", action: #selector(toggleHover), keyEquivalent: "")
+        hover.target = self; hover.state = UserDefaults.standard.bool(forKey: "openOnHover") ? .on : .off
+        menu.addItem(hover)
         let login = NSMenuItem(title: "Start at login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self; login.state = model.launchAtLogin ? .on : .off
         menu.addItem(login)
@@ -288,17 +293,113 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func toggleLogin() { model.toggleLaunchAtLogin() }
 
-    @objc func toggle() {
+    // MARK: Open on hover (optional, off by default; toggle in the right-click menu)
+    // Hovering the menu bar item opens the popover; moving away closes it. Clicking the item or anything inside the
+    // popover "pins" it open, so it behaves like a normal click-opened popover from then on.
+    var hoverOpened = false
+    var hoverTimer: Timer?
+    var hoverDelay: DispatchWorkItem?
+    var outsideTicks = 0
+
+    func installHover() {
         guard let b = item.button else { return }
-        if NSApp.currentEvent?.type == .rightMouseUp { showMenu(); return }
-        if popover.isShown { popover.performClose(nil) }
-        else {
-            popover.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
-            if let w = popover.contentViewController?.view.window {
-                w.setFrameOrigin(NSPoint(x: w.frame.origin.x, y: w.frame.origin.y + 8))
-                w.makeKey()
+        NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] e in
+            MainActor.assumeIsolated {
+                if let self, self.hoverOpened, e.window != nil, e.window === self.popover.contentViewController?.view.window {
+                    self.hoverOpened = false; self.stopHoverTimer()
+                }
             }
+            return e
         }
+    }
+
+    // The status bar button doesn't reliably deliver tracking-area events, so while the option is on we watch the
+    // pointer position a few times a second instead (cheap, and needs no permissions).
+    var pointerWasOver = false
+    var pointerTimer: Timer?
+
+    func updatePointerWatch() {
+        pointerTimer?.invalidate(); pointerTimer = nil; pointerWasOver = false
+        guard UserDefaults.standard.bool(forKey: "openOnHover") else { return }
+        let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.pointerTick() } }
+        RunLoop.main.add(t, forMode: .common)
+        pointerTimer = t
+    }
+
+    func pointerTick() {
+        guard let b = item.button, let w = b.window else { return }
+        let over = w.convertToScreen(b.convert(b.bounds, to: nil)).insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
+        if over && !pointerWasOver { mouseEntered() } else if !over && pointerWasOver { mouseExited() }
+        pointerWasOver = over
+    }
+
+    func mouseEntered() {
+        guard UserDefaults.standard.bool(forKey: "openOnHover"), !popover.isShown, item.menu == nil else { return }
+        hoverDelay?.cancel()
+        let w = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.openFromHover() } }
+        hoverDelay = w
+        hoverCue(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: w)   // a short pause, so passing over the icon doesn't pop it open
+    }
+    func mouseExited() { hoverDelay?.cancel(); hoverDelay = nil; hoverCue(false) }
+
+    /// While the pause runs, the icon swells slightly so you can see the popover is about to open.
+    func hoverCue(_ on: Bool) {
+        let to: CGFloat = on ? 1.2 : 1
+        let from = (content.presentation()?.value(forKeyPath: "transform.scale") as? CGFloat) ?? (on ? 1 : 1.2)
+        let a = CABasicAnimation(keyPath: "transform.scale")
+        a.fromValue = from; a.toValue = to
+        a.duration = on ? 0.3 : 0.15
+        a.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        content.add(a, forKey: "cue")
+        content.transform = CATransform3DMakeScale(to, to, 1)
+    }
+
+    func openFromHover() {
+        guard !popover.isShown else { return }
+        hoverCue(false)
+        showPopover(activate: false)
+        hoverOpened = true
+        outsideTicks = 0
+        hoverTimer?.invalidate()
+        let t = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.hoverTick() } }
+        RunLoop.main.add(t, forMode: .common)
+        hoverTimer = t
+    }
+
+    func hoverTick() {
+        guard hoverOpened, popover.isShown, let b = item.button, let bw = b.window,
+              let pw = popover.contentViewController?.view.window else { hoverOpened = false; stopHoverTimer(); return }
+        let button = bw.convertToScreen(b.convert(b.bounds, to: nil))
+        let zone = button.union(pw.frame).insetBy(dx: -8, dy: -8)   // button + popover + the gap between them
+        if zone.contains(NSEvent.mouseLocation) { outsideTicks = 0; return }
+        outsideTicks += 1
+        if outsideTicks >= 3 { popover.performClose(nil); hoverOpened = false; stopHoverTimer() }   // ~0.45s outside
+    }
+
+    func stopHoverTimer() { hoverTimer?.invalidate(); hoverTimer = nil }
+
+    @objc func toggleHover() {
+        let on = !UserDefaults.standard.bool(forKey: "openOnHover")
+        UserDefaults.standard.set(on, forKey: "openOnHover")
+        updatePointerWatch()
+    }
+
+    func showPopover(activate: Bool) {
+        guard let b = item.button else { return }
+        popover.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
+        if let w = popover.contentViewController?.view.window {
+            w.setFrameOrigin(NSPoint(x: w.frame.origin.x, y: w.frame.origin.y + 8))
+            if activate { w.makeKey() }
+        }
+    }
+
+    @objc func toggle() {
+        guard item.button != nil else { return }
+        if NSApp.currentEvent?.type == .rightMouseUp { showMenu(); return }
+        hoverDelay?.cancel(); hoverCue(false)
+        if hoverOpened && popover.isShown { hoverOpened = false; stopHoverTimer(); return }   // a click pins a hover-opened popover
+        if popover.isShown { popover.performClose(nil) } else { showPopover(activate: true) }
     }
 }
 
